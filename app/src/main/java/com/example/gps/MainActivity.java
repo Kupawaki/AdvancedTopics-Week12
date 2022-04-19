@@ -22,11 +22,17 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+import com.karumi.dexter.Dexter;
+import com.karumi.dexter.MultiplePermissionsReport;
+import com.karumi.dexter.PermissionToken;
+import com.karumi.dexter.listener.PermissionRequest;
+import com.karumi.dexter.listener.multi.MultiplePermissionsListener;
 
 import java.util.List;
 
 @SuppressLint({"SetTextI18n", "UseSwitchCompatOrMaterialCode"})
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity
+{
     //Hooks
     TextView latTV, lonTV, altitudeTV, accuracyTV, speedTV, sensorTV, updatesTV, addressTV;
     Switch locationSW, gpsSW;
@@ -37,8 +43,8 @@ public class MainActivity extends AppCompatActivity {
     LocationCallback locationCallBack;
 
     //Constants
-    public static final int SLOW_UPDATE_INTERVAL = 5;
-    public static final int FAST_UPDATE_INTERVAL = 1;
+    public static final int SLOW_UPDATE_INTERVAL = 30;
+    public static final int FAST_UPDATE_INTERVAL = 5;
     public static final int PERMISSIONS_FINE_LOCATION = 99;
 
     //Log Tags
@@ -50,8 +56,6 @@ public class MainActivity extends AppCompatActivity {
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        Log.d(LOCA, "Created");
 
         //Hooks
         latTV = findViewById(R.id.latTV);
@@ -90,45 +94,35 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
+        //Switch accuracy
         gpsSW.setOnClickListener(view ->
         {
-            if (gpsSW.isChecked()) {
+            if (gpsSW.isChecked())
+            {
                 locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
                 sensorTV.setText("GPS");
-            } else {
+            }
+            else
+            {
                 locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
                 sensorTV.setText("Cell Towers + WIFI");
             }
         });
 
+        //Switch tracking on/off
         locationSW.setOnClickListener(view ->
         {
-            if (locationSW.isChecked()) {
+            if (locationSW.isChecked())
+            {
                 startLocationUpdates();
-            } else {
+            }
+            else
+            {
                 stopLocationUpdates();
             }
         });
 
         updateGPS();
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
-        if (requestCode == PERMISSIONS_FINE_LOCATION)
-        {
-            if (grantResults[0] == PackageManager.PERMISSION_GRANTED)
-            {
-                updateGPS();
-            }
-            else
-            {
-                Toast.makeText(this, "The app requires permissions to br granted", Toast.LENGTH_LONG).show();
-                finish();
-            }
-        }
     }
 
     public void updateGPS()
@@ -144,7 +138,21 @@ public class MainActivity extends AppCompatActivity {
         else
         {
             Log.d(LOCA, "UpdateGPS - Requesting permission");
-            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSIONS_FINE_LOCATION);
+            Dexter.withContext(this).withPermissions(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                    .withListener(new MultiplePermissionsListener()
+                    {
+                        @Override
+                        public void onPermissionsChecked(MultiplePermissionsReport multiplePermissionsReport)
+                        {
+                            updateGPS();
+                        }
+
+                        @Override
+                        public void onPermissionRationaleShouldBeShown(List<PermissionRequest> list, PermissionToken permissionToken)
+                        {
+                            permissionToken.continuePermissionRequest();
+                        }
+                    }).check();
         }
     }
 
@@ -175,7 +183,6 @@ public class MainActivity extends AppCompatActivity {
         }
 
         Geocoder geocoder = new Geocoder(MainActivity.this);
-
         try
         {
             List<Address> addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
