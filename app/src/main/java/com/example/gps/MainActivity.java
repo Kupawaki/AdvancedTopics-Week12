@@ -7,6 +7,7 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
+import android.os.Looper;
 import android.util.Log;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -43,9 +44,8 @@ public class MainActivity extends AppCompatActivity
     LocationCallback locationCallBack;
 
     //Constants
-    public static final int SLOW_UPDATE_INTERVAL = 30;
-    public static final int FAST_UPDATE_INTERVAL = 5;
-    public static final int PERMISSIONS_FINE_LOCATION = 99;
+    public static final int SLOW_UPDATE_INTERVAL = 60;
+    public static final int FAST_UPDATE_INTERVAL = 30;
 
     //Log Tags
     public static final String LOCA = "LOCATION";
@@ -72,8 +72,9 @@ public class MainActivity extends AppCompatActivity
         //Location config
         locationRequest = LocationRequest.create();
         locationRequest.setInterval(1000 * SLOW_UPDATE_INTERVAL);
-        locationRequest.setFastestInterval(1000 * FAST_UPDATE_INTERVAL);
         locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
+
+        Log.d(LOCA, "OKAY");
 
         //Triggers when update interval is met
         locationCallBack = new LocationCallback()
@@ -99,14 +100,17 @@ public class MainActivity extends AppCompatActivity
         {
             if (gpsSW.isChecked())
             {
+                locationRequest.setInterval(1000 * FAST_UPDATE_INTERVAL);
                 locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
                 sensorTV.setText("GPS");
             }
             else
             {
+                locationRequest.setInterval(1000 * SLOW_UPDATE_INTERVAL);
                 locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
                 sensorTV.setText("Cell Towers + WIFI");
             }
+            Log.d(LOCA, "GPSSwitch - Interval: " + locationRequest.getInterval() + " and Priority: " + locationRequest.getPriority());
         });
 
         //Switch tracking on/off
@@ -121,8 +125,6 @@ public class MainActivity extends AppCompatActivity
                 stopLocationUpdates();
             }
         });
-
-        updateGPS();
     }
 
     public void updateGPS()
@@ -135,29 +137,11 @@ public class MainActivity extends AppCompatActivity
             Log.d(LOCA, "UpdateGPS - Getting last location");
             fusedLocationProviderClient.getLastLocation().addOnSuccessListener(this, this::updateUI);
         }
-        else
-        {
-            Log.d(LOCA, "UpdateGPS - Requesting permission");
-            Dexter.withContext(this).withPermissions(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-                    .withListener(new MultiplePermissionsListener()
-                    {
-                        @Override
-                        public void onPermissionsChecked(MultiplePermissionsReport multiplePermissionsReport)
-                        {
-                            updateGPS();
-                        }
-
-                        @Override
-                        public void onPermissionRationaleShouldBeShown(List<PermissionRequest> list, PermissionToken permissionToken)
-                        {
-                            permissionToken.continuePermissionRequest();
-                        }
-                    }).check();
-        }
     }
 
     public void updateUI(Location location)
     {
+        Toast.makeText(this, "Updating UI", Toast.LENGTH_SHORT).show();
         //Location can be null for a couple reasons,
         //Location service is off
         //Location has never been discovered before
@@ -199,14 +183,36 @@ public class MainActivity extends AppCompatActivity
         updatesTV.setText("ON");
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
         {
-            fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallBack, null);
+            Log.d(LOCA, "Requested Location Updates");
             updateGPS();
+            fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallBack, Looper.getMainLooper());
+        }
+        else
+        {
+            Log.d(LOCA, "UpdateGPS - Requesting permission");
+            Dexter.withContext(this).withPermissions(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                    .withListener(new MultiplePermissionsListener()
+                    {
+                        @Override
+                        public void onPermissionsChecked(MultiplePermissionsReport multiplePermissionsReport)
+                        {
+                            updateGPS();
+                        }
+
+                        @Override
+                        public void onPermissionRationaleShouldBeShown(List<PermissionRequest> list, PermissionToken permissionToken)
+                        {
+                            permissionToken.continuePermissionRequest();
+                        }
+                    }).check();
         }
     }
 
     public void stopLocationUpdates()
     {
         updatesTV.setText("OFF");
+
+        Log.d(LOCA, "Stopped Location Updates");
 
         latTV.setText("Location is not being tracked");
         lonTV.setText("Location is not being tracked");
